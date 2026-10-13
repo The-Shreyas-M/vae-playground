@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Data / large downloads (auto-downloaded by train.py, no need to push)
+data/
+*.gz
+*.ubyte
+
+# Logs / OS junk
+*.log
+.DS_Store
+Thumbs.db
+
+# Streamlit / IDE
+.streamlit/secrets.toml
+.vscode/
+.idea/
+
+# NOTE: we INTENTIONALLY keep these small artefacts in git so a
+# beginner can run the app without training:
+#   vae_weights.pth (~3 MB), latent_data.csv, latent_bounds.json
+!vae_weights.pth
+!latent_data.csv
+!latent_bounds.json

@@ -1,0 +1,10 @@
+# Runtime
+torch>=2.0
+torchvision>=0.15
+
+# App / UI
+streamlit>=1.30
+pandas>=2.0
+
+# Plotting
+matplotlib>=3.7
