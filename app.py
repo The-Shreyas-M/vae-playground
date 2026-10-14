@@ -13,13 +13,15 @@ Loads the trained weights (``vae_weights.pth``) and the latent projections
 
 Run with::
 
-    streamlit run app.py
+    streamlit run app.py                        # digits by default
+    streamlit run app.py -- --dataset emnist-letters   # letters pre-selected
 """
 
 from __future__ import annotations
 
 import json
 import os
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,14 +39,45 @@ DATASET_ASSETS = {
         "csv": "latent_data.csv",
         "bounds": "latent_bounds.json",
         "meta": "dataset_mnist.json",
+        "keywords": ("mnist", "digit", "digits", "0-9", "numbers"),
     },
     "EMNIST letters (A-Z)": {
         "weights": "vae_emnist_letters_weights.pth",
         "csv": "latent_emnist_letters.csv",
         "bounds": "latent_emnist_letters_bounds.json",
         "meta": "dataset_emnist_letters.json",
+        "keywords": ("emnist", "emnist-letters", "letter", "letters", "alphabet", "a-z"),
     },
 }
+
+
+def default_dataset(requested: str | None, available: list[str]) -> int:
+    """Index into ``available`` matching a ``--dataset`` CLI keyword.
+
+    Lets launcher scripts (e.g. ``runalphabets.bat`` passes
+    ``-- --dataset emnist-letters``) pre-select a dataset. Unknown or
+    missing values fall back to index 0 — never crash the dashboard.
+    """
+    if requested:
+        want = requested.strip().lower()
+        for i, name in enumerate(available):
+            if want in DATASET_ASSETS[name]["keywords"]:
+                return i
+    return 0
+
+
+def requested_dataset_arg() -> str | None:
+    """Read ``--dataset <name>`` from the script args (after ``--``)."""
+    args = sys.argv[1:]
+    # Streamlit consumes its own flags; ours come after a `--` separator.
+    if "--" in args:
+        args = args[args.index("--") + 1 :]
+    for i, a in enumerate(args):
+        if a == "--dataset" and i + 1 < len(args):
+            return args[i + 1]
+        if a.startswith("--dataset="):
+            return a.split("=", 1)[1]
+    return None
 
 
 def _palette(n: int):
@@ -152,7 +185,12 @@ if not available:
     )
     st.stop()
 
-choice = st.sidebar.selectbox("Dataset", list(available.keys()), index=0) if len(available) > 1 else list(available.keys())[0]
+# Visible dataset picker at the top of the page (not hidden in the
+# sidebar) so nobody misses it. `runalphabets.bat` pre-selects letters
+# by passing `-- --dataset emnist-letters`.
+options = list(available.keys())
+preselect = default_dataset(requested_dataset_arg(), options)
+choice = st.radio("Dataset — pick what the AI draws", options, index=preselect, horizontal=True)
 assets = available[choice]
 
 try:

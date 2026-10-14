@@ -77,7 +77,7 @@ streamlit run app.py
 
 Your browser opens automatically. Drag the sliders. Done.
 
-> Windows double-click fans: just double-click `run.bat`.
+> Windows double-click fans: `run.bat` = digits, `runalphabets.bat` = letters (A-Z pre-selected). You can also switch anytime with the **Dataset** buttons at the top of the page.
 
 ### Option B — "I want to train it myself"
 
