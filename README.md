@@ -1,6 +1,6 @@
-# VAE Playground — Draw Digits With 2 Sliders 🤖✏️
+# VAE Playground — Draw Digits AND Letters With 2 Sliders 🤖✏️
 
-> **In one line:** This app teaches a computer to doodle handwritten digits (0-9), then lets YOU control its imagination with just 2 sliders.
+> **In one line:** This app teaches a computer to doodle handwritten digits (0-9) AND capital letters (A-Z), then lets YOU control its imagination with just 2 sliders.
 
 No AI background needed. If you can move a slider, you can use this project.
 
@@ -79,22 +79,40 @@ Your browser opens automatically. Drag the sliders. Done.
 
 > Windows double-click fans: just double-click `run.bat`.
 
-### Option B — "I want to train it myself" (~5 minutes)
+### Option B — "I want to train it myself"
+
+**Digits (MNIST, ~5 min on CPU):**
 
 ```bash
-python train.py
+python train.py --dataset mnist
 ```
+
+**Alphabet (EMNIST Letters A-Z, ~2-4 min quick version on CPU):**
+
+```bash
+# Small + fast: 20,000 letters, 3 rounds. Perfect for class demos.
+python train.py --dataset emnist-letters --epochs 3 --max-train 20000
+```
+
+Want the full alphabet training? Drop `--max-train` (uses all ~125,000 letters, ~10-15 min on CPU):
+
+```bash
+python train.py --dataset emnist-letters --epochs 5
+```
+
+Other tiny 28×28 datasets work too: `--dataset fashion-mnist`, `--dataset kmnist` (Japanese characters, same size as MNIST).
 
 This will:
 
-- Download MNIST automatically (first time only, into `data/`)
-- Train for 5 rounds on whatever you have: NVIDIA GPU → Apple Silicon → plain CPU
-- Save 3 files:
-  - `vae_weights.pth` — the trained brain (~3 MB)
-  - `latent_data.csv` — map coordinates of 1,000 test digits
-  - `latent_bounds.json` — edges of the map (so sliders line up)
+- Download the dataset automatically (first time only, into `data/` — this folder is NOT pushed to GitHub)
+- Train on whatever you have: NVIDIA GPU → Apple Silicon → plain CPU
+- Save 4 files (names depend on dataset, e.g. EMNIST Letters):
+  - `vae_emnist_letters_weights.pth` — the trained brain (~3 MB)
+  - `latent_emnist_letters.csv` — map coordinates of 1,000 test letters (`x, y, label A-Z`)
+  - `latent_emnist_letters_bounds.json` — edges of the map (so sliders line up)
+  - `dataset_emnist_letters.json` — which dataset + class names
 
-Then run `streamlit run app.py` as above.
+Then run `streamlit run app.py` as above and pick the dataset from the sidebar — digits and letters can live side by side.
 
 ---
 
@@ -103,11 +121,14 @@ Then run `streamlit run app.py` as above.
 | File | What it is, in plain English |
 |------|------------------------------|
 | `app.py` | The playground website (Streamlit). Sliders + map + doodle. Start here to play. |
-| `train.py` | The school. Shows 60,000 digits to the AI 5 times. Run once if you want to re-train. |
+| `train.py` | The school. `python train.py --dataset mnist` for digits, `--dataset emnist-letters --epochs 3 --max-train 20000` for a fast A-Z run. |
 | `model.py` | The brain blueprint. Squeezer (encoder) + artist (decoder). Only ~100 lines, well commented. |
 | `requirements.txt` | Shopping list of Python packages. `pip install -r requirements.txt` buys them all. |
-| `vae_weights.pth` | Saved brain after school. Lets you skip training. |
-| `latent_data.csv` | 1,000 dots for the map: `x, y, digit`. |
+| `vae_weights.pth` | Saved brain after school (digits). Lets you skip training. |
+| `latent_data.csv` | 1,000 dots for the digit map: `x, y, digit`. |
+| `vae_emnist_letters_weights.pth` | Saved brain trained on the A-Z alphabet (3 epochs, 20k letters). Pick it from the app sidebar. |
+| `latent_emnist_letters.csv` | 1,040 dots for the letter map (40 per letter A-Z). |
+| `dataset_*.json` / `latent_*_bounds.json` | Sidecars: class names + slider ranges for each dataset. |
 | `run.bat` | Double-click launcher for Windows. |
 
 ---

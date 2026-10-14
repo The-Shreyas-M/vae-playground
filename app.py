@@ -29,11 +29,30 @@ import torch
 
 from model import VAE
 
-WEIGHTS_PATH = "vae_weights.pth"
-LATENT_PATH = "latent_data.csv"
-BOUNDS_PATH = "latent_bounds.json"
+# Artefact files per dataset. MNIST keeps legacy names; EMNIST-letters
+# (A-Z alphabet) gets its own files so both can coexist.
+DATASET_ASSETS = {
+    "MNIST digits (0-9)": {
+        "weights": "vae_weights.pth",
+        "csv": "latent_data.csv",
+        "bounds": "latent_bounds.json",
+        "meta": "dataset_mnist.json",
+    },
+    "EMNIST letters (A-Z)": {
+        "weights": "vae_emnist_letters_weights.pth",
+        "csv": "latent_emnist_letters.csv",
+        "bounds": "latent_emnist_letters_bounds.json",
+        "meta": "dataset_emnist_letters.json",
+    },
+}
 
-DIGIT_COLORS = plt.get_cmap("tab10").colors  # 10 colours, one per digit
+
+def _palette(n: int):
+    """Distinct colors for n classes (10 -> tab10, more -> hsv)."""
+    if n <= 10:
+        return plt.get_cmap("tab10").colors
+    cmap = plt.get_cmap("hsv")
+    return [cmap(i / n) for i in range(n)]
 
 
 # ---------------------------------------------------------------------------
@@ -41,29 +60,34 @@ DIGIT_COLORS = plt.get_cmap("tab10").colors  # 10 colours, one per digit
 # cache heavy operations (model loading, CSV parsing) with @st.cache_resource.
 # ---------------------------------------------------------------------------
 @st.cache_resource
-def load_model() -> VAE:
-    """Load the trained VAE weights onto CPU and set eval mode."""
+def load_model(weights_path: str) -> VAE:
+    """Load trained VAE weights onto CPU and set eval mode."""
     model = VAE(z_dim=2)
-    if not os.path.exists(WEIGHTS_PATH):
+    if not os.path.exists(weights_path):
         raise FileNotFoundError(
-            f"'{WEIGHTS_PATH}' not found. Run `python train.py` first."
+            f"'{weights_path}' not found. Run `python train.py` first."
         )
-    state = torch.load(WEIGHTS_PATH, map_location="cpu", weights_only=True)
+    state = torch.load(weights_path, map_location="cpu", weights_only=True)
     model.load_state_dict(state)
     model.eval()
     return model
 
 
 @st.cache_data
-def load_data():
+def load_data(csv_path: str, bounds_path: str):
     """Load the latent-space CSV and the optional precomputed bounds."""
-    if not os.path.exists(LATENT_PATH):
+    if not os.path.exists(csv_path):
         raise FileNotFoundError(
-            f"'{LATENT_PATH}' not found. Run `python train.py` first."
+            f"'{csv_path}' not found. Run `python train.py` first."
         )
-    df = pd.read_csv(LATENT_PATH)
-    if os.path.exists(BOUNDS_PATH):
-        bounds = json.load(open(BOUNDS_PATH))
+    df = pd.read_csv(csv_path)
+    # Normalise columns: new CSVs use label/label_name, old ones use digit.
+    if "label" not in df.columns and "digit" in df.columns:
+        df["label"] = df["digit"]
+    if "label_name" not in df.columns:
+        df["label_name"] = df["label"].astype(str)
+    if os.path.exists(bounds_path):
+        bounds = json.load(open(bounds_path))
     else:
         bounds = {
             "x_min": float(df.latent_x.min()) - 0.1,
@@ -75,17 +99,21 @@ def load_data():
 
 
 def draw_latent_scatter(df: pd.DataFrame, zoom: tuple[float, float, float, float]):
-    """Render the 2D latent space coloured by digit class."""
+    """Render the 2D latent space coloured by class (digit or letter)."""
+    classes = sorted(df["label"].unique().tolist())
+    colors = _palette(len(classes))
+    color_of = {c: colors[i] for i, c in enumerate(classes)}
+    name_of = df.drop_duplicates("label").set_index("label")["label_name"].to_dict()
     fig, ax = plt.subplots(figsize=(6, 5), dpi=110)
-    for digit in range(10):
-        subset = df[df.digit == digit]
+    for c in classes:
+        subset = df[df.label == c]
         ax.scatter(
             subset.latent_x,
             subset.latent_y,
             s=8,
             alpha=0.6,
-            label=str(digit),
-            color=DIGIT_COLORS[digit],
+            label=str(name_of.get(c, c)),
+            color=color_of[c],
         )
     ax.set_xlim(zoom[0], zoom[1])
     ax.set_ylim(zoom[2], zoom[3])
@@ -111,13 +139,25 @@ def decode_point(model: VAE, x: float, y: float) -> np.ndarray:
 st.set_page_config(page_title="VAE Latent Space Explorer", layout="wide")
 st.title("Interactive VAE Latent Space Explorer")
 st.caption(
-    "Train a 2D-latent VAE on MNIST (`python train.py`), then drag the sliders "
-    "to morph between digits decoded from the latent space."
+    "Train a 2D-latent VAE (`python train.py --dataset mnist` or "
+    "`--dataset emnist-letters`), then drag the sliders "
+    "to morph between characters decoded from the latent space."
 )
 
+available = {k: v for k, v in DATASET_ASSETS.items() if os.path.exists(v["weights"]) and os.path.exists(v["csv"])}
+if not available:
+    st.error(
+        "No trained models found. Run `python train.py --dataset mnist` or "
+        "`python train.py --dataset emnist-letters --epochs 3 --max-train 20000` first."
+    )
+    st.stop()
+
+choice = st.sidebar.selectbox("Dataset", list(available.keys()), index=0) if len(available) > 1 else list(available.keys())[0]
+assets = available[choice]
+
 try:
-    model = load_model()
-    df, bounds = load_data()
+    model = load_model(assets["weights"])
+    df, bounds = load_data(assets["csv"], assets["bounds"])
 except FileNotFoundError as err:
     st.error(err)
     st.stop()
